@@ -1,7 +1,7 @@
 {
-  "name": "Mensch Labs Coding Challenge",
-  "description": "A template for the Mensch Labs coding challenge",
-  "repository": "https://github.com/menschlabs/coding-challenge-template",
+  "name": "Movie Bot",
+  "description": "Movie Bot by Tanya and Nathan",
+  "repository": "https://github.com/Tanay1998/MovieBotMessenger",
   "image": "heroku/python",
   "keywords": ["python", "django" ],
   "addons": [ "heroku-postgresql" ],

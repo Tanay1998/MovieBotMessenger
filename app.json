@@ -1,0 +1,21 @@
+{
+  "name": "Mensch Labs Coding Challenge",
+  "description": "A template for the Mensch Labs coding challenge",
+  "repository": "https://github.com/menschlabs/coding-challenge-template",
+  "image": "heroku/python",
+  "keywords": ["python", "django" ],
+  "addons": [ "heroku-postgresql" ],
+  "scripts": {
+    "postdeploy": "python src/db_setup.py"
+  },
+  "env": {
+    "FACEBOOK_PAGE_ACCESS_TOKEN": {
+      "description": "An access token for a Facebook page. Needs to be updated",
+      "generator": "secret"
+    },
+    "SECRET_KEY": {
+      "description": "Secret key used for cookie signing by Flask",
+      "generator": "secret"
+    }
+  }
+}

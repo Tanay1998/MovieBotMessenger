@@ -1,0 +1,21 @@
+<!doctype html>
+<title>Mensch Labs Coding Challenge Template</title>
+{% if users %}
+  <ol>
+    {% for user in users %}
+      <li>{{ user.sender_id }}
+        {% if user.todos %}
+          <ol>
+            {% for todo in user.todos %}
+              <li>{{ todo.text }}</li>
+            {% endfor %}
+          </ol>
+        {% else %}
+          <p>No Todos for this user</p>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+{% else %}
+  <p>No users</p>
+{% endif %}

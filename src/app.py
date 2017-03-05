@@ -12,6 +12,7 @@ import flask
 import requests
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from chatbot import Chatbot
 
 FACEBOOK_API_MESSAGE_SEND_URL = (
     'https://graph.facebook.com/v2.6/me/messages?access_token=%s')
@@ -27,6 +28,7 @@ app.config['FACEBOOK_WEBHOOK_VERIFY_TOKEN'] = 'mysecretverifytoken'
 
 
 db = SQLAlchemy(app)
+chatbot = Chatbot()
 
 
 class User(db.Model):
@@ -128,134 +130,7 @@ def fb_webhook():
                 continue
             sender_id = event['sender']['id']
 
-            #Get user 
-            curUser = User.query.filter_by(sender_id=sender_id).first()
-            if curUser == None:
-                curUser = User(sender_id=sender_id)
-                db.session.add(curUser)
-                db.session.commit()
-                tutorial_send = get_tutorial()
-                request_url = FACEBOOK_API_MESSAGE_SEND_URL % (app.config['FACEBOOK_PAGE_ACCESS_TOKEN'])
-                requests.post(request_url, headers={'Content-Type': 'application/json'},
-                          json={'recipient': {'id': sender_id}, 'message': {'text': tutorial_send}})
-
-            message_text = (message['text']).strip()
-            print "Got: " + message_text
-
-            '''
-                Process message_text & Get message to send 
-            '''
-
-            message_send = "Invalid command. To view all commands, type 'help'"
-
-            # Display help
-            if word_has(message_text.split()[0], ["help"]):
-                message_send = get_tutorial()
-
-            # To view list of completed tasks
-            elif word_has(message_text.split()[0], ["list", "ls", "display"]) and word_has(message_text, ["done", "complete"]):       
-                message_send = "Completed Tasks:"
-
-                completeTodos = get_todo_tasks(curUser, True)
-                for i in range(len(completeTodos)):
-                    todo = completeTodos[i]
-                    message_send += "\n#%d: %s" % (i + 1, todo.text)
-                if len(completeTodos) == 0:
-                    message_send = "No tasks completed yet!"
-
-            #To view list of tasks todo
-            elif word_has(message_text.split()[0], ["list", "ls", "display"]):              
-                message_send = "Tasks Todo:"
-                incompleteTodos = get_todo_tasks(curUser, False)
-                for i in range(len(incompleteTodos)):
-                    todo = incompleteTodos[i]
-                    message_send += "\n#%d: %s" % (i + 1, todo.text)
-                if len(incompleteTodos) == 0:
-                    message_send = "No tasks todo!"   
-
-            #Clear tasks
-            elif word_has(message_text.split()[0], ["clear", "delete", "remove", "erase"]) and word_has(message_text, ["all", "complete", "finish", "todo"]):
-                deleteIncomplete = False 
-                deleteComplete = False 
-                if word_has(message_text, [" complete", " finish"]):
-                    deleteComplete = True
-                if word_has(message_text, [" incomplete", " todo"]):
-                    deleteIncomplete = True
-                if not deleteIncomplete and not deleteComplete:
-                    deleteIncomplete, deleteComplete = True, True
-
-                message_send = "Clearing tasks:"
-                if deleteComplete:
-                    TodoItem.query.filter_by(user=curUser).filter(TodoItem.dateCompleted != None).delete(synchronize_session=False)
-                    message_send += "\n\tCleared completed tasks"
-                if deleteIncomplete:
-                    TodoItem.query.filter_by(user=curUser).filter_by(dateCompleted = None).delete(synchronize_session=False)
-                    message_send += "\n\tCleared todo tasks"
-                db.session.commit()
-
-            elif len(message_text) > 0:
-                query = message_text.split()
-
-                #Search for tasks
-                if len(query) > 1 and word_has(query[0], ["search"]):
-                    searchQuery = ' '.join(query[1:])
-                    todoList = TodoItem.query.filter_by(user=curUser).order_by(TodoItem.dateAdded).all()
-                    matches = []
-                    for i in range(len(todoList)):
-                        todo = todoList[i]
-                        if searchQuery in todo.text:
-                            matches.append(todo.text + (" (Incomplete)" if todo.dateCompleted == None else " (Finished)"))
-                    if len(matches) == 0:
-                        message_send = "No matches found for search"
-                    else:
-                        message_send = "Found %d results: " % (len(matches))
-                        for match in matches:
-                            message_send += "\n\t" + match
-
-                #Add a new task
-                elif len(query) > 1 and word_has(query[0], ["add", "insert", "input"]):   # For adding a new todo
-                    text = ' '.join(query[1:])
-                    newTodo = TodoItem(text=text, user=curUser, dateAdded=datetime.utcnow(), dateCompleted=None)
-                    db.session.add(newTodo)
-                    db.session.commit()
-                    message_send = "To-do item '" + text + "' added to list."
-
-                elif len(query) > 1 and query[0][0] == '$':            # For Marking as complete, editing deleting
-                    index = int(query[0][1:])
-
-                    # Mark as finished
-                    if word_has(query[1], ["finish", "done", "complete"]):
-                        todoList = get_todo_tasks(curUser, False)
-                        if index > len(todoList):
-                            message_send = "A task with this index does not exist"
-                        else: 
-                            curTodo = todoList[index - 1]
-                            curTodo.dateCompleted = datetime.utcnow()
-                            db.session.commit()
-                            message_send = "Finished " + query[0] + ": " + curTodo.text
-
-                    # Edit task
-                    elif len(query) > 2 and word_has(query[1], ["edit", "modify", "change"]):
-                        todoList = get_todo_tasks(curUser, False)
-                        if index > len(todoList):
-                            message_send = "A task with this index does not exist"
-                        else: 
-                            curTodo = todoList[index - 1]
-                            curTodo.text = ' '.join(query[2:])
-                            db.session.commit()
-                            message_send = "Updated " + query[0] + ": " + curTodo.text
-
-                    #Delete task
-                    elif word_has(query[1], ["remove", "delete", "clear", "erase"]):
-                        todoList = get_todo_tasks(curUser, False)
-                        if index > len(todoList):
-                            message_send = "A task with this index does not exist"
-                        else: 
-                            curTodo = todoList[index - 1]
-                            db.session.delete(curTodo)
-                            db.session.commit()
-                            message_send = "Deleted " + query[0] + ": " + curTodo.text
-
+            message_send = chatbot.process(message)
 
             request_url = FACEBOOK_API_MESSAGE_SEND_URL % (app.config['FACEBOOK_PAGE_ACCESS_TOKEN'])
             requests.post(request_url, headers={'Content-Type': 'application/json'},
